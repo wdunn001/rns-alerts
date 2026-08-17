@@ -35,6 +35,32 @@ def _page_id(alert_id):
     return hashlib.md5((alert_id or "").encode()).hexdigest()[:16]
 
 
+# Cache for the Beacon-page alert banner: many page loads for the same area
+# shouldn't each hit NWS. Keyed on a coarse (0.01deg) point, short TTL.
+_active_cache = {}
+_ACTIVE_TTL = 300
+
+
+def active_worthy(lat, lon):
+    """Banner-worthy active alerts at a point: Severe+ or NWEM, excluding cancels.
+    Cached ~5 min per coarse point. Returns a (possibly empty) list; never raises."""
+    key = (round(float(lat), 2), round(float(lon), 2))
+    now = time.time()
+    hit = _active_cache.get(key)
+    if hit and now - hit[0] < _ACTIVE_TTL:
+        return hit[1]
+    worthy = []
+    try:
+        alerts = nws.active_for_point(key[0], key[1]) or []
+        for a in alerts:
+            if (a.get("msg_type") or "").lower() != "cancel" and nws.passes(a, "Severe"):
+                worthy.append(a)
+        _active_cache[key] = (now, worthy)
+    except Exception as e:  # noqa: BLE001
+        RNS.log(f"rns-alerts: active_worthy error: {e}", RNS.LOG_DEBUG)
+    return worthy
+
+
 def send_lxmf(dest_hash, text, title="Alert"):
     """Deliver one LXMF message. Direct if the recipient's identity is known
     (a subscriber just messaged us, so it is), else propagated via the pinned

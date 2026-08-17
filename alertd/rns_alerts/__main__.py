@@ -3,6 +3,7 @@ alert daemon on the main thread (RNS needs the main thread for signal handlers).
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 from . import alertd, config, store
 
@@ -12,6 +13,26 @@ class _Health(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        # /active?lat=&lon= -> banner-worthy alerts for a point (the Beacon page
+        # calls this for an opted-in user's location; pull, not push).
+        if self.path.startswith("/active"):
+            qs = parse_qs(urlparse(self.path).query)
+            out = []
+            try:
+                lat = float(qs.get("lat", [""])[0])
+                lon = float(qs.get("lon", [""])[0])
+                for a in alertd.active_worthy(lat, lon):
+                    out.append({"event": a.get("event"), "severity": a.get("severity"),
+                                "headline": a.get("headline"), "area": a.get("area"),
+                                "expires": a.get("expires")})
+            except Exception:
+                out = []
+            body = json.dumps({"alerts": out}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         try:
             nsubs = len(store.all_subs())
         except Exception:
