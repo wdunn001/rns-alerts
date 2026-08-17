@@ -1,0 +1,6 @@
+[project]
+name = "rns-alerts"
+version = "0.1.0"
+description = "NWS + emergency alerts pushed over Reticulum (LXMF), with a browsable NomadNet node."
+requires-python = ">=3.10"
+dependencies = ["rns", "lxmf"]

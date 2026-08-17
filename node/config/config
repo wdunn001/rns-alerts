@@ -1,0 +1,11 @@
+# NomadNet config for the rns-news node -- an independent page-serving NODE.
+[node]
+enable_node = yes
+node_name = ⚠ RNS-ALERTS
+announce_at_start = Yes
+announce_interval = 360
+disable_propagation = Yes
+page_refresh_interval = 15
+[logging]
+loglevel = 4
+destination = file

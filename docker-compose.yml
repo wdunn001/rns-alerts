@@ -1,0 +1,44 @@
+# rns-alerts-stack: NWS + emergency alerts over Reticulum.
+#   alertd          -- LXMF endpoint (subscribe by message) + poll loop that
+#                      pushes matching alerts to subscribers and writes pages.
+#   nomadnet-alerts -- browse node serving the active-alerts pages (MeshData
+#                      tagged, so Beacon indexes them).
+# Both host-network + connect to the .229 local rnsd hub (127.0.0.1:4343).
+services:
+  alertd:
+    build: ./alertd
+    image: alertd:local
+    container_name: alertd
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PYTHONUNBUFFERED: "1"
+      ALERTS_POLL_INTERVAL: "120"
+      HEALTH_PORT: "8222"
+      NOMINATIM_URL: "http://192.168.1.88:8092"
+      NWS_UA: "rns-alerts/0.1 (reticulum quasarke; +https://github.com/wdunn001/rns-alerts)"
+    volumes:
+      - alerts_data:/config
+      - rns_alerts_pages:/data/pages
+      - ./alertd/config/rns-config:/config/rns/config:ro
+
+  nomadnet-alerts:
+    build: ./node
+    image: nomadnet-alerts:local
+    container_name: nomadnet-alerts
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - alertd
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - nomadnet_alerts_data:/config/nomadnet
+      - ./node/config/config:/config/nomadnet/config:ro
+      - ./node/config/rns-config:/config/rns/config:ro
+      - rns_alerts_pages:/config/nomadnet/storage/pages
+
+volumes:
+  alerts_data:
+  rns_alerts_pages:
+  nomadnet_alerts_data:

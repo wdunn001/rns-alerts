@@ -1,0 +1,19 @@
+[reticulum]
+  enable_transport = No
+  share_instance = No
+  instance_name = quasarke_nomadnet_alerts
+[logging]
+  loglevel = 4
+[interfaces]
+  [[Local Peering Hub]]
+    type = TCPClientInterface
+    interface_enabled = True
+    enabled = True
+    target_host = 127.0.0.1
+    target_port = 4343
+  [[Parallel Public Net]]
+    type = TCPClientInterface
+    interface_enabled = True
+    enabled = True
+    target_host = rns1.buildwithparallel.com
+    target_port = 4242
