@@ -33,6 +33,15 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        # /subscribed?rid=<identity hash> -> is this identity subscribed to push?
+        if self.path.startswith("/subscribed"):
+            qs = parse_qs(urlparse(self.path).query)
+            body = json.dumps(alertd.subscription_status(qs.get("rid", [""])[0])).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         try:
             nsubs = len(store.all_subs())
         except Exception:
@@ -52,6 +61,29 @@ class _Health(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        # push opt-in from the Beacon account page: /subscribe + /unsubscribe by
+        # RNS identity hash (the account page has the hash; we derive the LXMF dest).
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(n) or b"{}") if 0 < n <= 65536 else {}
+        except Exception:
+            body = {}
+        rid = (body.get("rid") or "").strip()
+        if self.path.startswith("/unsubscribe"):
+            out = alertd.unsubscribe_by_identity(rid)
+        elif self.path.startswith("/subscribe"):
+            out = alertd.subscribe_by_identity(rid, body.get("lat"), body.get("lon"),
+                                               body.get("place") or "your area",
+                                               body.get("min_severity") or "Severe")
+        else:
+            out = {"ok": False, "err": "unknown op"}
+        data = json.dumps(out).encode()
+        self.send_response(200 if out.get("ok") else 400)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(data)
 
 
 def _serve_health():

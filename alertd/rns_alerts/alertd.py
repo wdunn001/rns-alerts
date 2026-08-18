@@ -80,6 +80,57 @@ def send_lxmf(dest_hash, text, title="Alert"):
     return True
 
 
+def _lxmf_hash_from_identity(rid_hex):
+    """The user's LXMF DELIVERY destination hash, DERIVED from their RNS identity
+    hash. A destination hash = full_hash(name_hash + identity.hash), so the identity
+    HASH (all a NomadNet/web account page has -- never the public key) is enough to
+    compute the address. Delivery still needs the user's client to have announced
+    (RNS recalls the key then); the subscription persists until it does."""
+    idh = bytes.fromhex((rid_hex or "").strip().lower())
+    if len(idh) != RNS.Reticulum.TRUNCATED_HASHLENGTH // 8:
+        raise ValueError("bad identity")
+    return RNS.Destination.hash(idh, "lxmf", "delivery")
+
+
+def subscribe_by_identity(rid_hex, lat, lon, place, min_sev="Severe"):
+    """Subscribe a user to push alerts from their identity hash (the account-page
+    opt-in). Stores by the derived LXMF delivery hash + best-effort confirmation."""
+    try:
+        dest = _lxmf_hash_from_identity(rid_hex)
+        lat, lon = float(lat), float(lon)
+    except Exception:
+        return {"ok": False, "err": "bad request"}
+    lxmf_hex = RNS.hexrep(dest, delimit=False)
+    store.add_sub(lxmf_hex, lat, lon, place or "your area", min_sev)
+    try:
+        if not RNS.Transport.has_path(dest):
+            RNS.Transport.request_path(dest)
+        send_lxmf(dest, f"You're subscribed to Quasarke Alerts for {place} "
+                  f"(>= {min_sev}). NWS warnings + AMBER/civil alerts arrive here. "
+                  "Reply 'unsubscribe' to stop.", "Quasarke Alerts")
+    except Exception:  # noqa: BLE001 -- confirmation is best-effort
+        pass
+    return {"ok": True, "lxmf": lxmf_hex, "place": place}
+
+
+def unsubscribe_by_identity(rid_hex):
+    try:
+        dest = _lxmf_hash_from_identity(rid_hex)
+    except Exception:
+        return {"ok": False, "err": "bad identity"}
+    return {"ok": True, "removed": store.remove_subs(RNS.hexrep(dest, delimit=False))}
+
+
+def subscription_status(rid_hex):
+    try:
+        dest = _lxmf_hash_from_identity(rid_hex)
+    except Exception:
+        return {"ok": False, "err": "bad identity"}
+    subs = store.list_subs(RNS.hexrep(dest, delimit=False))
+    return {"ok": True, "subscribed": bool(subs),
+            "subs": [{"place": s["place"], "min_severity": s["min_severity"]} for s in subs]}
+
+
 def _on_lxmf(message):
     """Inbound command from a subscriber -> handle + reply."""
     S.inbound_count += 1
