@@ -8,7 +8,7 @@ _SEV_MARK = {"Extreme": "!!!", "Severe": "!!", "Moderate": "!", "Minor": "", "Un
 
 def _clip(s, n):
     s = re.sub(r"\s+", " ", (s or "").strip())
-    return s if len(s) <= n else s[:n - 1].rstrip() + "…"
+    return s if len(s) <= n else s[:n - 3].rstrip() + "..."
 
 
 def format_push(alert, place):
@@ -20,7 +20,7 @@ def format_push(alert, place):
     if alert.get("severity"):
         meta = alert["severity"]
         if alert.get("urgency"):
-            meta += " · " + alert["urgency"]
+            meta += " - " + alert["urgency"]
         lines.append(meta)
     if alert.get("area"):
         lines.append(_clip(alert["area"], 160))
@@ -55,7 +55,7 @@ def alert_page(alert, place):
     if alert.get("effective"):
         head.append("# +date: " + esc(alert["effective"][:16].replace("T", " ")))
     body = ["`c`F900" + esc(alert.get("event", "Alert")) + "`f`a",
-            "`c`F888" + esc(place) + "  ·  " + esc(sev) + "`f`a", "-"]
+            "`c`F888" + esc(place) + "  -  " + esc(sev) + "`f`a", "-"]
     if alert.get("area"):
         body.append("`F888Area:`f " + esc(alert["area"]))
     if alert.get("expires"):
@@ -99,7 +99,7 @@ def index_page(active):
             bits = [b for b in (sev, alert.get("area", ""),
                     (("expires " + alert["expires"][:16].replace("T", " ")) if alert.get("expires") else ""))
                     if b]
-            body.append("  `F888" + esc("  ·  ".join(bits)) + "`f")
+            body.append("  `F888" + esc("  -  ".join(bits)) + "`f")
             body.append("")
     body.append("-")
     body.append("`F666Subscribe for push alerts: message the alerts node 'subscribe <place>'.`f")
